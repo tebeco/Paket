@@ -104,6 +104,24 @@ let internal parseAuth(text:string, source) =
     else
         getAuth()
 
+type NugetProtocolVersion = ProtocolVersion2 | ProtocolVersion3
+let protocolVersionRegex = Regex("protocolVersion[:][ ]*(\d)", RegexOptions.IgnoreCase ||| RegexOptions.Compiled)
+
+let internal parseProtocolVersion(text:string, source) =
+    if text.Contains("protocolVersion:") then
+        if not (protocolVersionRegex.IsMatch(text)) then
+            failwithf "Could not parse protocolVersion in \"%s\"" text
+
+        let textProtocolVersion = protocolVersionRegex.Match(text).Groups.[1].Value
+        let (parsed, specifiedProtocolVersion) = Int32.TryParse(textProtocolVersion)
+
+        match (parsed,specifiedProtocolVersion) with
+        | (true, 2) -> Some NugetProtocolVersion.ProtocolVersion2
+        | (true, 3) -> Some NugetProtocolVersion.ProtocolVersion3
+        | _ -> failwithf "Unsupported protocolVersion in \"%s\". Should be either 2 or 3" text
+    else
+        None
+
 /// Represents the package source type.
 type PackageSource =
 | NuGetV2 of NuGetSource
@@ -121,18 +139,18 @@ type PackageSource =
         | _ when urlSimilarToTfsOrVsts x.Url -> KnownNuGetSources.TfsOrVsts
         | _ -> KnownNuGetSources.UnknownNuGetServer
     static member Parse(line : string) =
-        let sourceRegex = Regex("source[ ]*[\"]([^\"]*)[\"]", RegexOptions.IgnoreCase)
+        let sourceRegex = Regex("source[ ]*[\"]([^\"]*)[\"][ ]*(protocolVersion[ ]*:\d)", RegexOptions.IgnoreCase)
         let parts = line.Split ' '
         let source =
             if sourceRegex.IsMatch line then
                 sourceRegex.Match(line).Groups.[1].Value.TrimEnd([| '/' |])
             else
                 parts.[1].Replace("\"","").TrimEnd([| '/' |])
-
         let feed = normalizeFeedUrl source
-        PackageSource.Parse(feed, parseAuth(line, feed))
 
-    static member Parse(source,auth) =
+        PackageSource.Parse(feed, parseProtocolVersion(line, feed), parseAuth(line, feed))
+
+    static member Parse(source, protocolVersion, auth) =
         match tryParseWindowsStyleNetworkPath source with
         | Some path -> PackageSource.Parse(path)
         | _ ->
@@ -145,11 +163,10 @@ type PackageSource =
 #endif
                     LocalNuGet(source,None)
                 else
-                    if source.Contains("/v3/") || (source.Contains "github.com" && source.EndsWith("index.json")) then
-                        NuGetV3 { Url = source; Authentication = auth }
-                    else
-                        NuGetV2 { Url = source; Authentication = auth }
-
+                    match protocolVersion with
+                    | Some NugetProtocolVersion.ProtocolVersion2 -> NuGetV2 { Url = source; Authentication = auth }
+                    | Some NugetProtocolVersion.ProtocolVersion3 -> NuGetV3 { Url = source; Authentication = auth }
+                    | None -> NuGetV3 { Url = source; Authentication = auth }
             | _ ->  match System.Uri.TryCreate(source, System.UriKind.Relative) with
                     | true, uri -> LocalNuGet(source,None)
                     | _ -> failwithf "unable to parse package source: %s" source
