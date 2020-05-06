@@ -48,9 +48,15 @@ type KnownNuGetSources =
     | MyGet
     | UnknownNuGetServer
 
+type NugetProtocolVersion =
+    | ProtocolVersion2
+    | ProtocolVersion3
+
+
 [<CustomComparison;CustomEquality>]
 type NuGetSource =
     { Url : string
+      ProtocolVersion: NugetProtocolVersion
       Authentication : AuthProvider }
     member x.BasicAuth isRetry =
         x.Authentication.Retrieve isRetry
@@ -71,6 +77,7 @@ type NuGetV3Source = NuGetSource
 let userNameRegex = Regex("username[:][ ]*[\"]([^\"]*)[\"]", RegexOptions.IgnoreCase ||| RegexOptions.Compiled)
 let passwordRegex = Regex("password[:][ ]*[\"]([^\"]*)[\"]", RegexOptions.IgnoreCase ||| RegexOptions.Compiled)
 let authTypeRegex = Regex("authtype[:][ ]*[\"]([^\"]*)[\"]", RegexOptions.IgnoreCase ||| RegexOptions.Compiled)
+let protocolVersionRegex = Regex("protocolVersion[:][ ]*(\d)", RegexOptions.IgnoreCase ||| RegexOptions.Compiled)
 
 let internal parseAuth(text:string, source) =
     let getAuth() =
@@ -104,8 +111,6 @@ let internal parseAuth(text:string, source) =
     else
         getAuth()
 
-type NugetProtocolVersion = ProtocolVersion2 | ProtocolVersion3
-let protocolVersionRegex = Regex("protocolVersion[:][ ]*(\d)", RegexOptions.IgnoreCase ||| RegexOptions.Compiled)
 
 let internal parseProtocolVersion(text:string, source) =
     if text.Contains("protocolVersion:") then
@@ -164,9 +169,9 @@ type PackageSource =
                     LocalNuGet(source,None)
                 else
                     match protocolVersion with
-                    | Some NugetProtocolVersion.ProtocolVersion2 -> NuGetV2 { Url = source; Authentication = auth }
-                    | Some NugetProtocolVersion.ProtocolVersion3 -> NuGetV3 { Url = source; Authentication = auth }
-                    | None -> NuGetV3 { Url = source; Authentication = auth }
+                    | Some NugetProtocolVersion.ProtocolVersion2 -> NuGetV2 { Url = source; ProtocolVersion = NugetProtocolVersion.ProtocolVersion2; Authentication = auth }
+                    | Some NugetProtocolVersion.ProtocolVersion3 -> NuGetV3 { Url = source; ProtocolVersion = NugetProtocolVersion.ProtocolVersion3; Authentication = auth }
+                    | None -> NuGetV3 { Url = source; ProtocolVersion = NugetProtocolVersion.ProtocolVersion3; Authentication = auth }
             | _ ->  match System.Uri.TryCreate(source, System.UriKind.Relative) with
                     | true, uri -> LocalNuGet(source,None)
                     | _ -> failwithf "unable to parse package source: %s" source
@@ -188,8 +193,8 @@ type PackageSource =
         | NuGetV3 n -> n.Authentication
         | LocalNuGet(n,_) -> CredentialProviders.GetAuthenticationProvider n
 
-    static member NuGetV2Source url = NuGetV2 { Url = url; Authentication = CredentialProviders.GetAuthenticationProvider url }
-    static member NuGetV3Source url = NuGetV3 { Url = url; Authentication = CredentialProviders.GetAuthenticationProvider url }
+    static member NuGetV2Source url = NuGetV2 { Url = url; ProtocolVersion = NugetProtocolVersion.ProtocolVersion2; Authentication  = CredentialProviders.GetAuthenticationProvider url }
+    static member NuGetV3Source url = NuGetV3 { Url = url; ProtocolVersion = NugetProtocolVersion.ProtocolVersion3; Authentication  = CredentialProviders.GetAuthenticationProvider url }
 
     static member FromCache (cache:Cache) = LocalNuGet(cache.Location,Some cache)
 
