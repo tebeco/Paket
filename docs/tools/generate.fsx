@@ -1,6 +1,6 @@
 /// Getting help docs from Paket.exe
-#r "../../bin/net461/Argu.dll"
-#r "../../bin/net461/Paket.exe"
+#r "../../packages/Argu/lib/netstandard2.0/Argu.dll"
+#r "../../src/Paket/bin/Release/netcoreapp2.1/Paket.dll"
 open System.IO
 
 
