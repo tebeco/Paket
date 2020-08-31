@@ -145,8 +145,9 @@ Target "AssemblyInfo" (fun _ ->
 
 Target "InstallDotNetCore" (fun _ ->
     dotnetExePath <- DotNetCli.InstallDotNetSDK dotnetcliVersion
+    let sdkPath = DotNetCli.DotnetSDKPath 
+    Environment.SetEnvironmentVariable("DOTNET_ROOT", sdkPath)
     Environment.SetEnvironmentVariable("DOTNET_MULTILEVEL_LOOKUP", "0")
-    Environment.SetEnvironmentVariable("DOTNET_ROOT", (directory dotnetExePath)))
 
 // --------------------------------------------------------------------------------------
 // Clean build results
