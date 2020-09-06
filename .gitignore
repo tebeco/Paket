@@ -6,6 +6,7 @@
 *.user
 *.sln.docstates
 *.sln.ide/
+.dotnet/
 
 # Xamarin Studio / monodevelop user-specific
 *.userprefs
