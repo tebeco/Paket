@@ -166,10 +166,22 @@ Target "AssemblyInfo" (fun _ ->
     csProjs |> Seq.iter genCSAssemblyInfo)
 
 Target "InstallDotNetCore" (fun _ ->
-    dotnetExePath <- DotNetCli.InstallDotNetSDK dotnetcliVersion
-    let sdkPath = DotNetCli.DotnetSDKPath 
-    Environment.SetEnvironmentVariable("DOTNET_ROOT", sdkPath)
+
+    let dotnetRoot =  currentDirectory </> ".dotnet"
+    let dotnetVersion = "3.1.401"
+    if isWindows then
+        let dotnetInstallScript = "https://dot.net/v1/dotnet-install.ps1"
+        let dotnetInstallCommand = sprintf "powershell -NoProfile -ExecutionPolicy unrestricted -Command ""[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; &([scriptblock]::Create((Invoke-WebRequest -UseBasicParsing %s))) -InstallDir ""%s"" -Version ""%s""" dotnetInstallScript dotnetRoot dotnetVersion
+    else 
+        let dotnetInstallScript = "https://dot.net/v1/dotnet-install.ps1"
+        let dotnetInstallCommand = curl -sSL https://dot.net/v1/dotnet-install.sh | bash /dev/stdin <additional install-script args>
+
+
+    Environment.SetEnvironmentVariable("DOTNET_ROOT", dotnetRoot)
     Environment.SetEnvironmentVariable("DOTNET_MULTILEVEL_LOOKUP", "0"))
+    let oldPath = Environment.GetEnvironmentVariable("PATH")
+    let path = Environment.SetEnvironmentVariable("PATH", sprintf "%s;%s" dotnetRoot oldPath))
+    ())
 
 // --------------------------------------------------------------------------------------
 // Clean build results
